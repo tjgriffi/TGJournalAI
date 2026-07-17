@@ -1,0 +1,100 @@
+name: iOS CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_PROJECT: TGJournalAI.xcodeproj
+  XCODE_SCHEME: TGJournalAI
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select an Xcode with an iOS Simulator runtime installed
+        run: |
+          FOUND=""
+          for app in /Applications/Xcode.app $(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -rV); do
+            [ -d "$app" ] || continue
+            sudo xcode-select -s "$app/Contents/Developer"
+            if xcrun simctl list runtimes available 2>/dev/null | grep -q "iOS "; then
+              FOUND="$app"
+              break
+            fi
+          done
+          if [ -z "$FOUND" ]; then
+            echo "::error::No installed Xcode with an iOS Simulator runtime was found on this runner" >&2
+            ls /Applications | grep -i xcode
+            exit 1
+          fi
+          echo "Using $FOUND"
+
+      - name: Show Xcode and Swift versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Select simulator destination
+        run: |
+          UDID=$(xcrun simctl list devices available -j | jq -r '
+            (.devices
+              | to_entries
+              | map(select(.key | test("SimRuntime\\.iOS-")))
+              | map(. + {ver: (.key | capture("iOS-(?<maj>[0-9]+)-(?<min>[0-9]+)") | (.maj|tonumber)*1000 + (.min|tonumber))})
+              | sort_by(.ver)
+              | reverse
+              | .[0].value // [])
+            | map(select(.name | test("iPhone")))
+            | (.[0].udid // empty)
+          ')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "::error::No available iPhone simulator found" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using simulator UDID: $UDID"
+          echo "DESTINATION=platform=iOS Simulator,id=$UDID" >> "$GITHUB_ENV"
+
+      - name: Resolve Swift package dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME"
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$DESTINATION" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "$DESTINATION" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult
+          retention-days: 7
