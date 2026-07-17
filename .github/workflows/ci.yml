@@ -24,18 +24,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
+      - name: Select an Xcode with an iOS Simulator runtime installed
+        run: |
+          FOUND=""
+          for app in /Applications/Xcode.app $(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -rV); do
+            [ -d "$app" ] || continue
+            sudo xcode-select -s "$app/Contents/Developer"
+            if xcrun simctl list runtimes available 2>/dev/null | grep -q "iOS "; then
+              FOUND="$app"
+              break
+            fi
+          done
+          if [ -z "$FOUND" ]; then
+            echo "::error::No installed Xcode with an iOS Simulator runtime was found on this runner" >&2
+            ls /Applications | grep -i xcode
+            exit 1
+          fi
+          echo "Using $FOUND"
 
       - name: Show Xcode and Swift versions
         run: |
           xcodebuild -version
           swift --version
-
-      - name: Ensure iOS Simulator platform is installed
-        run: xcodebuild -downloadPlatform iOS
 
       - name: Select simulator destination
         run: |
