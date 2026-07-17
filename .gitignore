@@ -1,0 +1,15 @@
+# Xcode
+DerivedData/
+build/
+*.xcresult
+*.ipa
+
+# User-specific Xcode state (schemes remain shared via xcshareddata)
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
