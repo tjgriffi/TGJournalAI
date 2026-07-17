@@ -14,7 +14,7 @@ concurrency:
 env:
   XCODE_PROJECT: TGJournalAI.xcodeproj
   XCODE_SCHEME: TGJournalAI
-  DESTINATION: platform=iOS Simulator,arch=arm64,id=FD9EC0F9-63AA-4C2F-B0F5-224AAE68866E,OS=26.5,name=iPhone 17 Pro
+  DESTINATION: platform=iOS Simulator,arch=arm64,iOS=26.5,name=iPhone 17 Pro
 
 jobs:
   build-and-test:
