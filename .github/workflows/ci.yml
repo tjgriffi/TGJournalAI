@@ -14,7 +14,6 @@ concurrency:
 env:
   XCODE_PROJECT: TGJournalAI.xcodeproj
   XCODE_SCHEME: TGJournalAI
-  DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro
 
 jobs:
   build-and-test:
@@ -34,6 +33,30 @@ jobs:
         run: |
           xcodebuild -version
           swift --version
+
+      - name: Ensure iOS Simulator platform is installed
+        run: xcodebuild -downloadPlatform iOS
+
+      - name: Select simulator destination
+        run: |
+          UDID=$(xcrun simctl list devices available -j | jq -r '
+            (.devices
+              | to_entries
+              | map(select(.key | test("SimRuntime\\.iOS-")))
+              | map(. + {ver: (.key | capture("iOS-(?<maj>[0-9]+)-(?<min>[0-9]+)") | (.maj|tonumber)*1000 + (.min|tonumber))})
+              | sort_by(.ver)
+              | reverse
+              | .[0].value // [])
+            | map(select(.name | test("iPhone")))
+            | (.[0].udid // empty)
+          ')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "::error::No available iPhone simulator found" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using simulator UDID: $UDID"
+          echo "DESTINATION=platform=iOS Simulator,id=$UDID" >> "$GITHUB_ENV"
 
       - name: Resolve Swift package dependencies
         run: |
