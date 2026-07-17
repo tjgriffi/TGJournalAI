@@ -14,12 +14,12 @@ concurrency:
 env:
   XCODE_PROJECT: TGJournalAI.xcodeproj
   XCODE_SCHEME: TGJournalAI
-  DESTINATION: platform=iOS Simulator,arch=x86_64,iOS=26.5,name=iPhone 17 Pro
+  DESTINATION: platform=iOS Simulator,name=iPhone 17 Pro
 
 jobs:
   build-and-test:
     name: Build and Test
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - name: Checkout
